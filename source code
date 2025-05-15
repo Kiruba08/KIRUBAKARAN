@@ -1,0 +1,83 @@
+# Step 1: Upload Dataset
+from google.colab import files
+import pandas as pd
+import io
+
+# Upload and read CSV
+uploaded = files.upload()
+df = pd.read_csv(io.BytesIO(uploaded[list(uploaded.keys())[0]]))
+
+# Display first few rows
+print("First 5 rows of the dataset:")
+print(df.head())
+
+# Step 2: Basic Data Overview
+print("\nData Info:\n")
+print(df.info())
+print("\nStatistical Summary:\n")
+print(df.describe())
+print("\nMissing Values:\n")
+print(df.isnull().sum())
+
+# Step 3: Data Preprocessing
+
+# Drop columns with more than 30% missing values
+df = df.dropna(thresh=len(df) * 0.7, axis=1)
+
+# Drop 'Id' column if it exists
+df = df.drop(columns=['Id'], errors='ignore')
+
+# Fill missing numerical values with median
+num_cols = df.select_dtypes(include=['float64', 'int64']).columns
+df[num_cols] = df[num_cols].fillna(df[num_cols].median())
+
+# Fill missing categorical values with mode
+cat_cols = df.select_dtypes(include=['object']).columns
+df[cat_cols] = df[cat_cols].fillna(df[cat_cols].mode().iloc[0])
+
+# One-hot encoding for categorical features
+df = pd.get_dummies(df, drop_first=True)
+
+# Step 4: Feature Selection
+
+# Define features and target
+if 'SalePrice' in df.columns:
+    X = df.drop('SalePrice', axis=1)
+    y = df['SalePrice']
+else:
+    raise ValueError("Target variable 'SalePrice' not found in dataset.")
+
+# Train-test split
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Step 5: Apply Regression Models
+from sklearn.linear_model import LinearRegression, Ridge, Lasso
+from sklearn.ensemble import RandomForestRegressor
+from xgboost import XGBRegressor
+from sklearn.metrics import mean_squared_error, r2_score
+
+# Initialize models
+models = {
+    'LinearRegression': LinearRegression(),
+    'Ridge': Ridge(),
+    'Lasso': Lasso(),
+    'RandomForest': RandomForestRegressor(n_estimators=100, random_state=42),
+    'XGBoost': XGBRegressor(n_estimators=100, random_state=42, verbosity=0)
+}
+
+# Step 6: Train & Evaluate Models
+print("\nModel Evaluation Results:")
+for name, model in models.items():
+    model.fit(X_train, y_train)
+    preds = model.predict(X_test)
+    rmse = mean_squared_error(y_test, preds, squared=False)
+    r2 = r2_score(y_test, preds)
+    print(f'{name} - RMSE: {rmse:.2f}, R2 Score: {r2:.3f}')
+
+# Step 7: Save Best Model (Optional)
+import joblib
+best_model = models['XGBoost']  # Replace with your chosen best model
+joblib.dump(best_model, 'best_house_price_model.pkl')
+
+print("\n✅ Best model saved as 'best_house_price_model.pkl'")
